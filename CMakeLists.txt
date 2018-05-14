@@ -3,4 +3,4 @@ project(playground)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(playground main.cpp)
+add_executable(playground main.cpp 2darray.h)

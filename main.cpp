@@ -1,12 +1,13 @@
 #include <iostream>
 #include <string>
-
+#include "2darray.h"
 
 int main() {
+    std::cout << "Starting main()" << std::endl;
 
-    std::cout << "Hello, World!" << std::endl;
+    ds::Array2D<int> array2d(10,10);
 
 
-
+    std::cout << "Ending main()" << std::endl;
     return 0;
 }
