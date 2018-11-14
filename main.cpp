@@ -7,6 +7,7 @@ int main() {
 
     ds::Array2D<int> array2d(10,10);
 
+    std::cout << "Hello World!" << std::endl;
 
     std::cout << "Ending main()" << std::endl;
     return 0;
