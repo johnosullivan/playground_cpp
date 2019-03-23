@@ -2,8 +2,8 @@
 // Created by John O'Sullivan on 5/13/18.
 //
 
-#ifndef PLAYGROUND_2DARRAY_H
-#define PLAYGROUND_2DARRAY_H
+#ifndef PLAYGROUND_MATRIX_H
+#define PLAYGROUND_MATRIX_H
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -12,7 +12,7 @@ namespace ds {
 
     template <typename T=char>
 
-    class Array2D {
+    class Matrix {
 
     private:
 
@@ -22,20 +22,20 @@ namespace ds {
 
     public:
 
-        Array2D(uint32_t _row, uint32_t _col) {
+        Matrix(uint32_t _row, uint32_t _col) {
             rows = _row;
             columns = _col;
             data = new T[_row * _col];
         }
 
-        ~Array2D() {
+        ~Matrix() {
             delete [] data;
         }
 
     private:
 
-        Array2D(const Array2D&);
-        Array2D& operator=(const Array2D&);
+        Matrix(const Matrix&);
+        Matrix& operator=(const Matrix&);
 
     public:
 

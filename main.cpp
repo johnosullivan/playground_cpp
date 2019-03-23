@@ -1,41 +1,40 @@
 #include <iostream>
 #include <string>
-#include "2darray.h"
 #include <typeinfo>
 #include <vector> 
+#include <optional>
+#include <functional>
 
-class Test
-{
-    // Access specifier
-    public:
+/*
+ * Included the JSON for Modern C++ 
+ * MIT: https://github.com/nlohmann/json
+ */
+#include "json.hpp"
 
-    // Data Members
-    std::string geekname;
+//using namespace std;
 
-    // Member Functions()
-    void printname()
-    {
-       std::cout << "Test is: " << geekname << std::endl;
-    }
+void processRequest() {
 
-    Test() {
-        std::cout << "Test Constructor" << std::endl;
-    }
 
-    ~Test() {
-        std::cout << "Test Deonstructor" << std::endl;
-    }
+}
 
-    private:
-
-    // Data Members
-    std::string name;
-};
+std::optional<int> string_to_int(std::string rawValue, int base) {
+    std::string::size_type size;
+    try {
+        return std::stoi(rawValue, &size, base);
+    } catch (...) { }
+    return { };
+}
 
 int main() {
-   std::cout << "Starting main()" << std::endl;
-
+    std::cout << "Starting main()" << std::endl;
     
+    std::cout << string_to_int("127", 0).value() << std::endl;
 
-   return 0;
+    std::cout << string_to_int("127 North Ave", 0).value() << std::endl;
+
+    std::cout << string_to_int("1111111", 2).value() << std::endl;
+
+    std::cout << "Ending main()" << std::endl;
+    return 0;
 } 
