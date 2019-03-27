@@ -9,6 +9,8 @@ set(CMAKE_CXX_STANDARD 17)
 
 find_package(websocketpp CONFIG REQUIRED)
 
+#find_package(nlohmann CONFIG REQUIRED)
+
 find_package(Boost 1.45.0 COMPONENTS filesystem regex)
 
 if(Boost_FOUND)
