@@ -16,6 +16,8 @@ std::string VERSION_NAME = "v0.1.0";
  */
 #include <nlohmann/json.hpp>
 
+using json = nlohmann::json;
+
 /*
  * Incldued websocketpp for all the websockets (RFC6455) 
  * BSD: https://github.com/zaphoyd/websocketpp 
@@ -31,11 +33,32 @@ using websocketpp::lib::bind;
 
 typedef std::set<websocketpp::connection_hdl,std::owner_less<websocketpp::connection_hdl>> connection_set;
 typedef websocketpp::server<websocketpp::config::asio> server;
+typedef server::message_ptr message_ptr;
 connection_set connections;
 
-// pull out the type of messages sent by our config
-typedef server::message_ptr message_ptr;
 
+class Session {
+    std::string uuid;
+    connection_set players;
+
+  public:
+    Session();
+    std::string get_id() {
+        return uuid;
+    }
+    void set_players(connection_set _players) {
+        players = _players;
+    }
+};
+
+Session::Session () {
+    /* Creates the unique uuid for a given session */
+    uuid = sole::uuid4().str();
+}
+
+/*
+ * Helper functions for data transformations 
+ */
 std::optional<int> string_to_int(std::string rawValue, int base) {
     /* alloc size_type */
     std::string::size_type size;
@@ -76,11 +99,18 @@ std::optional<std::vector<std::string>> string_to_vector(std::string rawValue) {
 void on_message(server* s, websocketpp::connection_hdl hdl, message_ptr msg) {
     std::cout << "HDL: " << hdl.lock().get() << " PAYLOAD: " << msg->get_payload() << std::endl;
 
-
     try {
-        s->send(hdl, msg->get_payload(), msg->get_opcode());
+        //s->send(hdl, msg->get_payload(), msg->get_opcode());
+        json payload = json::parse(msg->get_payload());
+        //std::cout << "payload: " << payload["session_id"] << std::endl;
+
+        /*for (it = connections.begin(); it != connections.end(); ++it) {
+            s->send(*it, msg->get_payload(), msg->get_opcode());
+        }*/
     } catch (websocketpp::exception const & e) {
         std::cout << "ERROR: " << "(" << e.what() << ")" << std::endl;
+    } catch (...) {
+        std::cout << "You done fucked up somewhere, johnny boi" << std::endl;
     }
 }
 
@@ -94,23 +124,17 @@ void on_close(server* s, websocketpp::connection_hdl hdl) {
     connections.erase(hdl);
 }
 
-server echo_server;
-
-void while_loop_send(int x) 
+void dispatcher_thread(server &server_ref) 
 { 
     while (true) { 
         std::cout << connections.size() << std::endl;
-
         connection_set::iterator it;
 
-        std::stringstream ss;
-        ss << sole::uuid4();
-
         for (it = connections.begin(); it != connections.end(); ++it) {
-            echo_server.send(*it, ss.str(), websocketpp::frame::opcode::text);
+            server_ref.send(*it, sole::uuid4().str(), websocketpp::frame::opcode::text);
         }
 
-        std::this_thread::sleep_for (std::chrono::milliseconds(500));
+        std::this_thread::sleep_for (std::chrono::seconds(1));
     } 
 } 
 
@@ -118,28 +142,32 @@ int main() {
     std::cout << "Starting Playground++ Version ";
     std::cout << VERSION_NAME << std::endl;
 
-    /* Started websockets */
+    Session session1;
+    std::cout << session1.get_id() << std::endl;
 
-    std::thread tp(while_loop_send, 0);
+    /* Started websockets */
+    server ws_server;
+
+    //std::thread tp(dispatcher_thread, std::ref(ws_server));
 
     try {
-        echo_server.set_access_channels(websocketpp::log::alevel::all);
+        ws_server.set_access_channels(websocketpp::log::alevel::all);
 
-        echo_server.clear_access_channels(websocketpp::log::alevel::frame_payload);
+        ws_server.clear_access_channels(websocketpp::log::alevel::frame_payload);
 
-        echo_server.init_asio();
+        ws_server.init_asio();
 
-        echo_server.set_message_handler(bind(&on_message,&echo_server,::_1,::_2));
+        ws_server.set_message_handler(bind(&on_message,&ws_server,::_1,::_2));
 
-        echo_server.set_open_handler(bind(&on_open,&echo_server,::_1));
+        ws_server.set_open_handler(bind(&on_open,&ws_server,::_1));
 
-        echo_server.set_close_handler(bind(&on_close,&echo_server,::_1));
+        ws_server.set_close_handler(bind(&on_close,&ws_server,::_1));
 
-        echo_server.listen(9000);
+        ws_server.listen(9000);
 
-        echo_server.start_accept();
+        ws_server.start_accept();
 
-        echo_server.run();
+        ws_server.run();
     } catch (websocketpp::exception const & e) {
         std::cout << e.what() << std::endl;
     } catch (...) { }
