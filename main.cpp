@@ -124,58 +124,47 @@ class Console {
 
 
 class Session {
+
     public:
         server *thread_server;
 
         Session(server *_thread_server) : session_thread() { 
             thread_server = _thread_server;
-            Console::println("session_server_ptr: ", thread_server);
+            uuid = sole::uuid4().str();
+            Console::println("Session(", thread_server, ")");
         }
 
         ~Session(){
-            Console::println("~Session");
+            Console::println("~Session(", uuid, ")");
             terminate_session();
         }
 
-        void session_msg_handler(server &s, websocketpp::connection_hdl hdl, server::message_ptr msg) {
-            std::cout << "session_msg_handler: " << msg.get() << std::endl;
-
-            /*connection_set::iterator it;
-            for (it = connections.begin(); it != connections.end(); ++it) {
-                if (!connections_equal(*it,hdl)) {
-                    s.send(*it, msg->get_payload(), msg->get_opcode());
-                }
-            }*/
-        }
-
         void start(){
-            Console::println("session_start");
+            Console::println("Session.start(", thread_server, ")");
+            Console::println("  =====> ", uuid);
             session_thread = std::thread(&Session::thread_main,this);
             in_progress = true;
         }
 
         void terminate_session() {
-            Console::println("terminate_session");
             stop_thread = true;
             if(session_thread.joinable()) {
                 session_thread.join();
             }
         }
 
-        void add_connection(websocketpp::connection_hdl hdl) {
-            //std::cout << "session_thread_add_connection_hdl: " << hdl.lock().get() << std::endl;
-            //connections.insert(hdl);
-        }
-
-         void thread_main(){
+        void thread_main(){
             while(!stop_thread){
-                Console::println("session_msg_handler_connections_size: ");
-                //std::cout << "session_msg_handler_connections_size: " << connections.size() << std::endl;
+                Console::println("session_msg_handler_connections_size: ", connections.size());
                 
                 temp_count++;
 
-                if (temp_count == 3) {
-                    in_progress = false;
+                if (temp_count != 3) {
+                    //in_progress = false;
+                    connection_set::iterator it;
+                    for (it = connections.begin(); it != connections.end(); ++it) {
+                        thread_server->send(*it, "ss", websocketpp::frame::opcode::text);
+                    }
                 }
                 
                 std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -190,7 +179,25 @@ class Session {
             return uuid;
         }
 
+        void session_msg_handler(server &s, websocketpp::connection_hdl hdl, server::message_ptr msg);
+        /* {
+            std::cout << "Message sent to custom handler: " << msg->get_payload() <<std::endl;
+            
+            connection_set::iterator it;
+            for (it = connections.begin(); it != connections.end(); ++it) {
+                if (!connections_equal(*it,hdl)) {
+                    s.send(*it, msg->get_payload(), msg->get_opcode());
+                }
+            }
+        }*/
+
+        void add_connection(websocketpp::connection_hdl hdl) {
+            std::cout << "session_thread_add_connection_hdl: " << hdl.lock().get() << std::endl;
+            connections.insert(hdl);
+        }
+
      private:
+        connection_set connections;
         bool stop_thread = false;
         bool in_progress = false;
         std::string uuid;
@@ -198,8 +205,9 @@ class Session {
         int temp_count;
 };
 
-void custom_on_msg(server & s, websocketpp::connection_hdl hdl, server::message_ptr msg) {
+void Session::session_msg_handler(server & s, websocketpp::connection_hdl hdl, server::message_ptr msg) {
         std::cout << "Message sent to custom handler" << std::endl;
+        Console::println("Session::session_msg_handler: ", connections.size());
 }
 
 /*
@@ -231,7 +239,7 @@ void on_message(server& s, websocketpp::connection_hdl hdl, message_ptr msg) {
 
             // Change the on message handler for this connection only to
             // custom_on_mesage
-            con->set_message_handler(bind(&custom_on_msg,std::ref(s),::_1,::_2));
+            // con->set_message_handler(bind(&custom_on_msg,std::ref(s),::_1,::_2));
 
             std::cout << "Upgrading connection to custom handler" << std::endl;
         }
@@ -290,97 +298,98 @@ void dispatcher_thread(server& server_ref)
     while (true) { 
         int count = ready_connections.size();
 
-        Console::println("dispatcher_thread_count");
+        Console::println("dispatcher_thread_count: ", count);
 
-        if (count == 1) {
-            //mtx_main_thread.lock();
+        if (count == 2) {
+            connection_set::iterator it;
 
-            //std::cout << "dispatcher_thread_server_ptr: " << std::ref(server_ref) << std::endl;
+            Session * current_session = new Session(&server_ref);
 
-            //Session current_session = Session(&server_ref);
-
-            //connection_set::iterator it;
-
-            /* for (it = ready_connections.begin(); it != ready_connections.end(); ++it) {
+            for (it = ready_connections.begin(); it != ready_connections.end(); ++it) {
                 server::connection_ptr con = server_ref.get_con_from_hdl(*it);
 
                 std::cout << "dispatcher_thread_connection_ptr: " << con << std::endl;
                 
-                //server_ref.send(*it, std::to_string((int)2019), websocketpp::frame::opcode::text);
-                
-                current_session.add_connection(*it);
+                current_session->add_connection(*it);
 
-                //con->set_message_handler(bind(current_session.session_msg_handler,std::ref(server_ref),::_1,::_2));
+                con->set_message_handler(bind(current_session->session_msg_handler,std::ref(server_ref),::_1,::_2));
+            }
 
-                //con->set_message_handler(bind(&custom_on_msg,std::ref(server_ref),::_1,::_2));
-            }*/
+            current_session->start();
 
-            //current_session.start();
-
-            //sessions_vector.push_back(current_session);
-
-            //sessions_vector.push_back(current_session);
-
-            //ready_connections.clear();
-
-            //sessions_vector.push_back(current_session);
-
-            //mtx_main_thread.unlock();
+            ready_connections.clear();
         }
+
         std::this_thread::sleep_for (std::chrono::seconds(10));
     } 
 } 
 
 std::set<Session*> global_sessions_set;
+std::map<std::string,Session*> test;
 
 bool status_test = true;
 
 void sessions_clean_up_thread() 
-{   
-    while (status_test) { 
-        std::cout << "sessions_clean_up_thread_count: " << global_sessions_set.size() << std::endl;
+{   std::mutex pushLock;
+    while (status_test) {
+        std::this_thread::sleep_for (std::chrono::seconds(5)); 
+        
+        std::cout << "sessions_clean_up_thread_count: " << test.size() << std::endl;
+    
 
-        std::set<Session*>::iterator it;
-
-        for (it = global_sessions_set.begin(); it != global_sessions_set.end(); ++it) {
-            Session * session_temp = *it;
-
-            std::cout << "session_temp_ptr: " << (*it) << std::endl;
-
-            if ((*it)->get_progress() == false) {
-                //global_sessions_set.erase(session_temp);
-                delete (*it);
+        if (test.size() == 1) {
+            Session * session_temp = test["test"];
+            if (session_temp->get_progress() == false) {
+                delete test["test"];
+                test.erase("test");          
             }
         }
 
-        std::this_thread::sleep_for (std::chrono::seconds(1));
+
+        /*std::set<Session*>::iterator it;
+
+        for (it = global_sessions_set.begin(); it != global_sessions_set.end(); ++it) {
+            Session * session_temp = (*it);s
+
+            std::cout << "session_temp_ptr: " << session_temp << std::endl;
+
+            if (session_temp->get_progress() == false) {
+                
+                //delete session_temp;
+            }
+        } */
+
+        //std::this_thread::sleep_for (std::chrono::seconds(1));
     } 
 } 
 
 int main() {
     std::cout << "Starting Playground++ Version " << VERSION_NAME << std::endl;
 
-    std::thread clean_sessions(sessions_clean_up_thread);
+    //std::thread clean_sessions(sessions_clean_up_thread);
 
-    std::this_thread::sleep_for (std::chrono::seconds(5));
+    //std::this_thread::sleep_for (std::chrono::seconds(5));
 
     /* Started websockets */
     server ws_server;
 
-    Session * current_session = new Session(&ws_server);
-    current_session->start();
+    //Session * current_session = new Session(&ws_server);
+    //current_session->start();
 
-    std::cout << "current_session_ptr: " << current_session << std::endl;
+    //std::cout << "current_session_ptr: " << current_session << std::endl;
 
-    global_sessions_set.insert(current_session);
+    //global_sessions_set.insert(current_session);
 
+    //test["test"] = current_session;
 
-    std::this_thread::sleep_for (std::chrono::seconds(10));
+    //std::this_thread::sleep_for (std::chrono::seconds(15));
 
-    status_test = false;
-    clean_sessions.join();
+    //delete current_session;
 
-    /*std::thread tp(dispatcher_thread, std::ref(ws_server));
+    //status_test = false;
+    //clean_sessions.join();
+
+    std::thread tp(dispatcher_thread, std::ref(ws_server));
 
     std::cout << &ws_server << std::endl;
     
@@ -404,7 +413,7 @@ int main() {
         ws_server.run();
     } catch (websocketpp::exception const & e) {
         std::cout << e.what() << std::endl;
-    } catch (...) { }*/
+    } catch (...) { }
     
     return 0; 
 }
