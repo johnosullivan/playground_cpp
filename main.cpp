@@ -164,10 +164,6 @@ class Session {
 
         void thread_main(){
             while(!stop_thread){
-                if (doneCount == connections.size()) {
-                    in_progress = false;
-                    std::cout << "Done: " << uuid << std::endl; 
-                }
                 std::this_thread::sleep_for(std::chrono::seconds(1));
             }
         }
@@ -186,9 +182,13 @@ class Session {
         }
 
         void send_frame(std::string rawData, json data, websocketpp::connection_hdl hdl) {
-            if (o.find("done") != o.end()) {
+            if (data.find("done") != data.end()) {
                 // there is an entry with key "foo"
                 doneCount = doneCount + 1;
+                if (doneCount == connections.size()) {
+                    in_progress = false;
+                    std::cout << "Done: " << uuid << std::endl; 
+                }
             }
 
             connection_set::iterator it;
