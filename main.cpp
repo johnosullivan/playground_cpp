@@ -95,8 +95,6 @@ bool connections_equal(websocketpp::connection_hdl t, websocketpp::connection_hd
 }
 
 
-
-
 class Console {
     private:
         Console() = default;
@@ -123,6 +121,7 @@ class Console {
             print(head, tail..., "\n");
         }
 };
+
 
 class Session {
 
@@ -178,7 +177,6 @@ class Session {
 
         void add_connection(websocketpp::connection_hdl hdl) {
             connections.insert(hdl);
-
         }
 
         void send_frame(std::string rawData, json data, websocketpp::connection_hdl hdl) {
@@ -197,6 +195,11 @@ class Session {
                     thread_server->send(*it, rawData, websocketpp::frame::opcode::text);
                 }
             }
+        }
+
+        void on_message(server& s, websocketpp::connection_hdl hdl, message_ptr msg) {
+            std::cout << "HDL: " << hdl.lock().get() << "SESSION PAYLOAD: " << msg->get_payload() << std::endl;
+
         }
 
      private:
@@ -219,14 +222,14 @@ void on_message(server& s, websocketpp::connection_hdl hdl, message_ptr msg) {
     std::cout << "HDL: " << hdl.lock().get() << " PAYLOAD: " << msg->get_payload() << std::endl;
     try {
         
-        auto data = json::parse(msg->get_payload());
+        /*auto data = json::parse(msg->get_payload());
         
         std::string key = data["session_id"];
 
-        global_sessions_map[key]->send_frame(msg->get_payload(),data ,hdl);
+        global_sessions_map[key]->send_frame(msg->get_payload(),data ,hdl);*/
 
     } catch (websocketpp::exception const & e) { 
-
+        std::cout << e.what() << std::endl;
     } catch (...) { 
         std::cout << "Error" << std::endl;
     }
@@ -264,6 +267,11 @@ void dispatcher_thread(server& server_ref)
                 std::cout << "dispatcher_thread_connection_ptr: " << con << std::endl;
                 
                 current_session->add_connection(*it);
+
+                //con->set_message_handler(bind(&current_session->on_message,std::ref(server_ref),::_1,::_2));
+                //con->set_message_handler(bind(current_session->on_message,std::ref(server_ref),::_1,::_2));
+                //con->set_message_handler(bind(&Session::on_message,std::ref(server_ref),::_1,::_2));
+                //con->set_message_handler(bind(&Session::on_message,current_session,::_1,::_2));
             }
 
             Console::println("current_session: ", current_session->get_id());
@@ -286,12 +294,12 @@ int main() {
     /* Started websockets */
     server ws_server;
 
-    std::thread dispatcher(dispatcher_thread, std::ref(ws_server));
+    //std::thread dispatcher(dispatcher_thread, std::ref(ws_server));
 
     std::cout << &ws_server << std::endl;
     
     try {
-        ws_server.set_access_channels(websocketpp::log::alevel::fail);
+        ws_server.set_access_channels(websocketpp::log::alevel::all);
 
         ws_server.clear_access_channels(websocketpp::log::alevel::frame_payload);
 
